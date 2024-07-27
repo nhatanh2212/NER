@@ -1,151 +1,118 @@
 import streamlit as st
+from numpy import arange
+import joblib
+import datetime as dt
 import pandas as pd
-import math
-from pathlib import Path
+import numpy as np
+from collections import Counter
+import streamlit as st
+from sklearn_crfsuite import CRF, metrics
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
-
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
-
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
+# Show title and description.
+st.markdown(
     """
-
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
-
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
+    <style>
+    .title {
+        color: #054279; 
+        font-size: 2em; 
+        text-align: left; 
+        margin-bottom: 20px;
+    }
+    .section-title {
+        color: #054279; 
+        font-size: 1.5em; 
+        margin-top: 30px; 
+        margin-bottom: 10px;
+    }
+    .text {
+        font-size: 1.1em; 
+        line-height: 1.6;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
-''
-''
 
+col1, col2 = st.columns([1,4], vertical_alignment="center",gap="large")
+col1.image("logo.jpg", width=120)
+col2.markdown(
+            '<div class="title">ENHANCING NAMED ENTITY RECOGNITION FOR VIETNAMESE PROSE WRITTEN IN CHINESE USING FINETUNE CRF </div>', unsafe_allow_html=True)
 
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
+st.markdown('<div class="section-title">Named Entity Recognition</div>', unsafe_allow_html=True)
+st.markdown('<div class="text">Named Entity Recognition (NER) is an essential task in the field of Natural Language Processing (NLP). The goal of NER is to identify specific entities with meaningful names from the text, such as person names, location names, organization names, dates, times, currencies, etc. NER finds widespread applications in information extraction, question-answering systems, machine translation, text classification, and more. By recognizing named entities in the text, it helps in understanding the meaning of the text, extracting key information, and enabling more in-depth semantic analysis and reasoning.</div>', unsafe_allow_html=True)
 
-st.header(f'GDP in {to_year}', divider='gray')
+st.markdown('<div class="section-title">Named Entity Recognition For Traditional Vietnamese Prose Written in Chinese</div>', unsafe_allow_html=True)
+st.markdown('<div class="text">Named Entity Recognition (NER) for traditional Vietnamese prose written in Chinese involves automatically identifying and extracting specific meaningful entity names from the text. These entities can include names of historical figures, locations, literary works, and cultural terms within Vietnamese literature composed in the Chinese language. Implementing NER in this context supports automated processing, search capabilities, and analytical tasks, thereby enriching scholarly research, cultural preservation efforts, and linguistic studies related to Vietnamese literature in its historical Chinese form.</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">Entity Tag</div>', unsafe_allow_html=True)
 
-''
+df = pd.DataFrame({
+    "Entity": ["Person(PER)","Location (LOC)","Time (DTM)", "Organization(ORG)", "Title(TITLE)", "Document(DOC)", "Other(O)"],
+    "Introduction": ["Person entities include historical figures, writers, politicians, and other individuals mentioned in documents, playing important roles in various events.", 
+                     " Location entities refer to geographical locations, regions, and buildings that are crucial for setting the context in documents.",
+                     "Time entities involve specific dates, eras, and times, helping to build the timeline and context of events in Vietnamese documents.",
+                     "Organization entities cover entities such as government, social groups, influencing different aspects of society",
+                     "Title entities include names of books, articles, and poems",
+                     "Document entities refer to texts, records, and books that serve as media for knowledge and cultural heritage in Vietnamese documents.",
+                     "Other text not in the label"
+                     ]
+})
 
-cols = st.columns(4)
+st.table(df)
 
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
+model = joblib.load('crf_model.joblib')
 
-    with col:
-        first_gdp = first_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[gdp_df['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
+def extract_features(sequence):
+    def word_shape(word):
+        if word.isupper():
+            return 'UPPER'
+        elif word.islower():
+            return 'LOWER'
+        elif word.istitle():
+            return 'TITLE'
         else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
+            return 'MIXED'
 
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+    return [{'char': char,
+             'is_upper': char.isupper(),
+             'is_digit': char.isdigit(),
+             'is_punctuation': char in '!?,.:;"\'()',
+             'prev_char': '' if i == 0 else sequence[i-1],
+             'next_char': '' if i == len(sequence)-1 else sequence[i+1],
+             'char_position': i,
+             'word_shape': word_shape(char)}
+            for i, char in enumerate(sequence)]
+
+def predict_labels(model, input_line):
+    features = extract_features(list(input_line))
+    pred_labels = model.predict_single(features)
+
+    combined_results = []
+    current_label = None
+    current_word = ''
+
+    for char, label in zip(input_line, pred_labels):
+        if label == current_label:
+            current_word += char
+        else:
+            if current_word:
+                combined_results.append((current_word, current_label))
+            current_word = char
+            current_label = label
+
+    if current_word:
+        combined_results.append((current_word, current_label))
+
+    return combined_results
+
+
+def main():
+        raw_data = st.text_area("Enter Input Text here")
+        if st.button("Show Entities"):
+            if raw_data == '':
+                st.warning("Sorry, Please input your data to access this functionality!!")
+            else:
+                predicted_labels = predict_labels(model, raw_data)
+                st.write(predicted_labels)
+
+main()
