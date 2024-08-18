@@ -6,8 +6,18 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 import streamlit as st
-from sklearn_crfsuite import CRF, metrics
+# from sklearn_crfsuite import CRF, metrics
+import re
 
+LABEL_COLORS = {
+    "PER": "blue",
+    "LOC": "green",
+    "DTM": "purple",
+    "ORG": "red",
+    "TITLE": "orange",
+    "DOC": "teal",
+    "O": "gray"
+}
 # Show title and description.
 st.markdown(
     """
@@ -16,6 +26,7 @@ st.markdown(
         color: #054279; 
         font-size: 2em; 
         text-align: left; 
+
         margin-bottom: 20px;
     }
     .section-title {
@@ -106,13 +117,34 @@ def predict_labels(model, input_line):
     return combined_results
 
 
-def main():
-        raw_data = st.text_area("Enter Input Text here")
-        if st.button("Show Entities"):
-            if raw_data == '':
-                st.warning("Sorry, Please input your data to access this functionality!!")
-            else:
-                predicted_labels = predict_labels(model, raw_data)
-                st.write(predicted_labels)
+def preprocess_data(text):
 
+    text = text.replace(" ", "")
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    return sentences
+
+
+def format_output(sentence, predicted_labels):
+    formatted_sentence = sentence
+    for label_pair in predicted_labels:
+        entity, label = label_pair
+        # Get the color for the label
+        color = LABEL_COLORS.get(label, "black")
+        # Highlight the entity with the corresponding color
+        formatted_sentence = formatted_sentence.replace(entity, f"<span style='color:{color}; font-weight:bold;'>{entity} ({label})</span>")
+    return formatted_sentence
+
+def main():
+    raw_data = st.text_area("Enter Input Text here")
+    if st.button("Show Entities"):
+        if raw_data == '':
+            st.warning("Sorry, Please input your data to access this functionality!!")
+        else:
+            preprocessed_data = preprocess_data(raw_data)
+            for sentence in preprocessed_data:
+                sentence = sentence.replace(".", "")
+                predicted_labels = predict_labels(model, sentence)
+                formatted_sentence = format_output(sentence, predicted_labels)
+                st.markdown(formatted_sentence, unsafe_allow_html=True)
+                
 main()
