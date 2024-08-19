@@ -71,7 +71,7 @@ df = pd.DataFrame({
 
 st.table(df)
 
-model = joblib.load('crf_model.joblib')
+model = joblib.load('crf_model-2.joblib')
 
 def extract_features(sequence):
     def word_shape(word):
@@ -124,15 +124,67 @@ def preprocess_data(text):
     return sentences
 
 
+# def format_output(sentence, predicted_labels):
+#     formatted_sentence = sentence
+#     for label_pair in predicted_labels:
+#         entity, label = label_pair
+#         # Get the color for the label
+#         color = LABEL_COLORS.get(label, "black")
+#         # Highlight the entity with the corresponding color
+#         formatted_sentence = formatted_sentence.replace(entity, f"<span style='color:{color}; font-weight:bold;'>{entity} ({label})</span>")
+#     return formatted_sentence
+
+def merge_labels(predicted_labels):
+    merged_labels = []
+    current_entity = ""
+    current_label = None
+
+    for entity, label in predicted_labels:
+        # Separate the label and its part (B, I, E)
+        if '-' in label:
+            label, part = label.split('-')
+        else:
+            part = None
+        
+        if part == "B":
+            # Start of a new entity
+            if current_entity:
+                merged_labels.append((current_entity, current_label))
+            current_entity = entity
+            current_label = label
+        elif part == "I":
+            # Continuation of an entity
+            current_entity += entity
+        elif part == "E":
+            # End of an entity
+            current_entity += entity
+            merged_labels.append((current_entity, current_label))
+            current_entity = ""
+            current_label = None
+        else:
+            # Outside of any entity
+            if current_entity:
+                merged_labels.append((current_entity, current_label))
+            current_entity = ""
+            current_label = None
+            merged_labels.append((entity, "O"))
+    
+    # If any entity is left unmerged, add it
+    if current_entity:
+        merged_labels.append((current_entity, current_label))
+
+    return merged_labels
+
 def format_output(sentence, predicted_labels):
     formatted_sentence = sentence
-    for label_pair in predicted_labels:
-        entity, label = label_pair
-        # Get the color for the label
-        color = LABEL_COLORS.get(label, "black")
-        # Highlight the entity with the corresponding color
-        formatted_sentence = formatted_sentence.replace(entity, f"<span style='color:{color}; font-weight:bold;'>{entity} ({label})</span>")
+    merged_labels = merge_labels(predicted_labels)
+    for entity, label in merged_labels:
+        if label != "O":
+            color = LABEL_COLORS.get(label, "black")
+            # Highlight the entity with the corresponding color
+            formatted_sentence = formatted_sentence.replace(entity, f"<span style='color:{color}; font-weight:bold;'>{entity} ({label})</span>")
     return formatted_sentence
+
 
 def main():
     raw_data = st.text_area("Enter Input Text here")
